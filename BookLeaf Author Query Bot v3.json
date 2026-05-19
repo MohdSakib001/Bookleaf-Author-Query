@@ -1,0 +1,986 @@
+{
+  "name": "BookLeaf Author Query Bot v3",
+  "nodes": [
+    {
+      "parameters": {
+        "public": true,
+        "options": {
+          "inputPlaceholder": "Ask about your book, royalties, timeline...",
+          "subtitle": "I am Leafi, your BookLeaf publishing assistant. How can I help you today?",
+          "title": "BookLeaf Author Support",
+          "responseMode": "lastNode"
+        }
+      },
+      "id": "c2a95d22-8ac3-4e1d-a58d-bd48206672a6",
+      "name": "Chat Trigger",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -1440,
+        208
+      ],
+      "webhookId": "d860d8c2-e79c-4591-8028-51c87f7563a4"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// BRAIN PREP: Build the user message to send to AI Agent\n// History is handled automatically by Window Buffer Memory\n// ============================================================\n\nconst chatInput = $('Chat Trigger').first().json.chatInput ?? '';\n\nconst systemPrompt = `You are Leafi, BookLeaf Publishing's AI support assistant. You are warm, helpful, and concise.\n\n=== KNOWLEDGE BASE ===\nCHALLENGE OVERVIEW:\n- Fee: Rs.1999 one-time. Includes full publishing (paperback + eBook), ISBN, design, layout, author support.\n- 21-day poetry writing challenge. Minimum 18 poems required. No upper limit.\n- Flexible submission: one per day, multiple per day, or all at once before deadline.\n- No restrictions on theme, format, or length.\n- 7-day automatic extension if 21 days are not enough.\n- Cannot get a refund for failing to complete the challenge.\n- All ages welcome. No age limit. Returning authors can rejoin any number of times.\n\nLANGUAGES: English, Hindi, Hinglish only. No regional languages (Urdu, Marathi, Bengali etc.) currently.\n\nREFUND POLICY: Unconditional, no-questions-asked refund within 14 days of registration. No refunds after 14 days.\n\nPUBLISHING TIMELINE: 30 to 45 business days after final submission. Status shows \"In Review\" during this period.\n\nDISTRIBUTION:\n- Default (included): BookLeaf online store only — paperback and eBook.\n- eBooks are NOT on Amazon or third-party platforms.\n- Extended (add-on): Amazon (all 13 international marketplaces), Barnes & Noble, Ingram (30,000+ stores and libraries).\n- Physical retail stores: NOT available. Online only.\n\nAUTHOR COPY:\n- India authors only. One free copy via coupon code emailed after publication.\n- Usually free shipping; minimal charges possible in remote areas.\n- Authors outside India are not eligible.\n\nROYALTIES: 80% on profits from book sales. Report provided after book is live.\n\nADD-ONS AVAILABLE:\n1. Global and Extended Distribution — Amazon 13 markets + Barnes & Noble + Ingram.\n2. 21st Century Emily Dickinson Award — Symbolic literary award for outstanding poetry.\n3. Bestseller Breakthrough Package — Includes global distribution + promotional services.\n4. PR Service — Press release and media outreach.\n\nCOVER QUALITY: 230 GSM premium cover. 75 GSM interior pages.\n\nCOPYRIGHT: 100% owned by the author always. BookLeaf only acts as publishing partner.\n\nDASHBOARD: https://dashboard.bookleafpub.in — Login credentials emailed within 2 minutes of payment.\nFORGOT PASSWORD: Use \"Forgot Password\" on the dashboard login page.\nSUPPORT TICKET: https://bookleafpublishing.freshdesk.com/support/tickets/new\nTUTORIAL VIDEO: https://youtu.be/Z9wxMeo624k\nREGISTER: https://www.bookleafpub.in/writing-challenge\n\nDASHBOARD NOTES:\n- Hindi poems: Use Google Input Tools or paste from external editor.\n- Poems cannot be rearranged via drag-drop. Delete and re-upload in desired order.\n- Acknowledgement, Dedication, Preface sections are mandatory and cannot be removed.\n- No image uploads in poems — text only.\n- Cover design requires laptop/desktop. Not supported on mobile browsers.\n- Custom front cover size: exactly 5 x 8 inches.\n- Back cover: no custom image upload, but text editable (60 words each for About Book and About Author).\n- Profile photo: can be added but cannot be removed once uploaded — only replaced.\n\nGENUINENESS: 16,000+ books published. 14,000+ authors. Featured on Shark Tank India Season 4. \"Roots\" by Rini Choudhury launched at Rashtrapati Bhavan.\nInstagram: @bookleafpublishing\n\nDISCOUNT / HIDDEN CHARGES: No hidden charges. Rs.1999 covers everything. Optional add-ons are separate purchases.\n=== END KNOWLEDGE BASE ===\n\n=== YOUR TASK ===\nRead the conversation history and the user's latest message. Then return ONLY a raw JSON object — absolutely no markdown, no backticks, no explanation before or after.\n\nJSON SHAPE (return exactly this, all fields required):\n{\n  \"intent\": \"<one of: greeting | book_live_status | royalty_status | author_copy | add_on_status | dashboard_access | general_faq | unknown>\",\n  \"needs_db\": <true or false>,\n  \"email_in_history\": <true or false>,\n  \"extracted_email\": \"<email string if found anywhere in current message OR conversation history, else null>\",\n  \"confidence\": <number 0.0 to 1.0>,\n  \"response\": \"<your final reply to the user — see rules below>\"\n}\n\n=== DECISION RULES ===\n\nSTEP 1 — INTENT CLASSIFICATION:\n- greeting: message is just a greeting (hi, hello, hey, hii, good morning, namaste etc) with no question.\n- book_live_status: asking if their book is published/live/available/released.\n- royalty_status: asking about royalties, earnings, payment, when they get paid.\n- author_copy: asking about their free author copy, physical copy, book delivery, courier.\n- add_on_status: asking about their add-on services (Global Distribution, Award, Bestseller Package, PR).\n- dashboard_access: asking about login, password, dashboard issues, submission portal.\n- general_faq: any question answerable from the Knowledge Base without needing personal account data.\n- unknown: gibberish, random characters, completely off-topic, cannot be understood.\n\nSTEP 2 — NEEDS DB:\n- Set needs_db = true ONLY for: book_live_status, royalty_status, author_copy, add_on_status.\n- Set needs_db = false for: greeting, general_faq, dashboard_access, unknown.\n\nSTEP 3 — EMAIL EXTRACTION:\n- Look carefully in BOTH the current message AND the full conversation history for an email address.\n- If found anywhere: set extracted_email to that email string, set email_in_history = true.\n- If not found anywhere: set extracted_email = null, set email_in_history = false.\n\nSTEP 4 — CONFIDENCE:\n- greeting, general_faq, dashboard_access: confidence = 0.95\n- book_live_status, royalty_status, author_copy, add_on_status (clear queries): confidence = 0.90\n- unknown / gibberish / completely off-topic: confidence = 0.20\n- If you're unsure between two intents: confidence = 0.65\n\nSTEP 5 — RESPONSE FIELD:\n- If intent = greeting: warm greeting, introduce yourself as Leafi, ask how you can help. Never escalate.\n- If intent = general_faq or dashboard_access: answer directly and helpfully from the KB. Never ask for email.\n- If needs_db = true AND extracted_email = null (no email found anywhere): response = \"To look up your account details, could you please share your registered email address?\"\n- If needs_db = true AND extracted_email is present: response = \"Fetching your account details...\"\n- If confidence < 0.80: respond with escalation message — tell the user you couldn't understand and give the support link: https://bookleafpublishing.freshdesk.com/support/tickets/new\n- If intent = unknown: same escalation response.\n\n=== CRITICAL MEMORY RULE ===\nIf the conversation history shows the user previously asked a DB question (e.g. \"is my book live\") and then the bot asked for their email, and now the user has replied with an email — you MUST correctly identify:\n- The original intent from history (e.g. book_live_status)\n- The email from the current message\n- Set needs_db = true, extracted_email = <the email>, email_in_history = true\nDo NOT classify a standalone email reply as \"unknown\". Read the history.\n\n=== ABSOLUTE RULES ===\n- NEVER fabricate or guess DB data (book status, live dates, royalties). You do not have that data.\n- NEVER ask for email if intent does not need DB.\n- NEVER ask for email if email is already in the conversation history.\n- Return ONLY the raw JSON object. Nothing before it. Nothing after it.`;\n\nreturn [{\n  json: {\n    systemPrompt,\n    userMessage: chatInput\n  }\n}];"
+      },
+      "id": "ec2bf369-ba5e-4975-9f30-7e4ebd83fa60",
+      "name": "Build Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1168,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Build Prompt').first().json.userMessage }}",
+        "options": {
+          "systemMessage": "={{ $('Build Prompt').first().json.systemPrompt }}",
+          "maxIterations": 1
+        }
+      },
+      "id": "77d3ddb9-f551-43dd-bc58-a9ab22677f44",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        -896,
+        208
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {
+          "maxTokens": 800,
+          "temperature": 0.3
+        }
+      },
+      "id": "cd8ca628-9a66-4669-b0ff-613a6ff48e2f",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -896,
+        416
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "fbl8IV7afDurlIyQ",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Chat Trigger').first().json.sessionId }}",
+        "contextWindowLength": 12
+      },
+      "id": "b74139f3-ed9d-4682-aadf-71cbcd975113",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -1104,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// PARSE AI AGENT RESPONSE — robust extraction + normalisation\n// ============================================================\n\nconst items = $input.all();\nconst item = items[0];\nconst content = item.json;\n\n// Pull raw text from wherever n8n puts it\nlet rawText = '';\ntry {\n  rawText = content?.output\n    ?? content?.message?.content\n    ?? content?.choices?.[0]?.message?.content\n    ?? content?.text\n    ?? JSON.stringify(content);\n} catch(e) {\n  rawText = JSON.stringify(content);\n}\n\n// Strip markdown code fences if model wraps in them\nconst clean = rawText\n  .replace(/```json\\s*/gi, '')\n  .replace(/```\\s*/g, '')\n  .trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(clean);\n} catch(e) {\n  parsed = {\n    intent: 'unknown',\n    needs_db: false,\n    email_in_history: false,\n    extracted_email: null,\n    confidence: 0,\n    response: 'I had trouble understanding that. Please contact our support team at https://bookleafpublishing.freshdesk.com/support/tickets/new'\n  };\n}\n\n// Normalise all fields with safe defaults\nconst intent = String(parsed.intent ?? 'unknown').trim();\nlet needs_db = parsed.needs_db === true || parsed.needs_db === 'true';\nconst email_in_history = parsed.email_in_history === true || parsed.email_in_history === 'true';\nconst confidence = typeof parsed.confidence === 'number' ? parsed.confidence : parseFloat(parsed.confidence ?? '0');\nconst response = String(parsed.response ?? '').trim();\n\n// Email: normalise to clean string or empty string\nlet extracted_email = '';\nif (parsed.extracted_email && parsed.extracted_email !== 'null' && String(parsed.extracted_email).includes('@')) {\n  extracted_email = String(parsed.extracted_email).trim().toLowerCase();\n}\n\n// ENFORCE DB ROUTE IF EMAIL IS PRESENT\nif (extracted_email && !['greeting', 'general_faq'].includes(intent)) {\n  needs_db = true;\n}\n\nreturn [{\n  json: {\n    intent,\n    needs_db,\n    email_in_history,\n    extracted_email,\n    confidence,\n    gpt_response: response,\n    original_query: $('Chat Trigger').first().json.chatInput ?? ''\n  }\n}];"
+      },
+      "id": "f8894340-a1ed-4241-9e73-23e3a6e9e843",
+      "name": "Parse GPT JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -512,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// AI ERROR HANDLER — fires if AI Agent itself errored\nreturn [{\n  json: {\n    intent: 'unknown',\n    needs_db: false,\n    email_in_history: false,\n    extracted_email: '',\n    confidence: 0,\n    gpt_response: 'Our AI assistant is temporarily unavailable. Please try again in a moment or raise a support ticket at https://bookleafpublishing.freshdesk.com/support/tickets/new',\n    original_query: $('Chat Trigger').first().json.chatInput ?? '',\n    route: 'ai_error'\n  }\n}];"
+      },
+      "id": "9741af1b-7d5a-440d-8332-251f80590c78",
+      "name": "AI Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -496,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ Number($json.confidence) }}",
+                    "operator": {
+                      "type": "number",
+                      "operation": "lt"
+                    },
+                    "rightValue": 0.8,
+                    "id": "00e1a091-7293-44ff-921f-1b2b856cf529"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "escalate"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c3f71425-1bcf-4465-98a5-129135f5fd5a",
+                    "leftValue": "={{ $json.needs_db && $json.email_in_history }}",
+                    "rightValue": false,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "fetch_db"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "a1081a1f-c79d-48f6-8cea-bb16d58491be",
+                    "leftValue": "={{ $json.needs_db && !$json.email_in_history }}",
+                    "rightValue": false,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ask_email"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "kb_or_greeting"
+        }
+      },
+      "id": "2ad4fdbc-b432-44f6-9c56-38ef09ffe0b4",
+      "name": "Smart Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -288,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "escalate-resp",
+              "name": "final_response",
+              "value": "I am not sure I understood that correctly. To make sure you get the right help, I would recommend reaching out to our support team directly:\n\nhttps://bookleafpublishing.freshdesk.com/support/tickets/new\n\nOur team typically responds within 24 hours.",
+              "type": "string"
+            },
+            {
+              "id": "escalate-route",
+              "name": "route",
+              "value": "escalated",
+              "type": "string"
+            },
+            {
+              "id": "escalate-intent",
+              "name": "intent",
+              "value": "={{ $json.intent }}",
+              "type": "string"
+            },
+            {
+              "id": "escalate-email",
+              "name": "extracted_email",
+              "value": "={{ $json.extracted_email }}",
+              "type": "string"
+            },
+            {
+              "id": "escalate-conf",
+              "name": "confidence",
+              "value": "={{ $json.confidence }}",
+              "type": "number"
+            },
+            {
+              "id": "escalate-query",
+              "name": "original_query",
+              "value": "={{ $json.original_query }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3abbb5ef-ea72-4035-b555-909b31c4e19e",
+      "name": "Escalation Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://rbuvyhycyauftckmsxgu.supabase.co/rest/v1/authors?email=eq.{{ encodeURIComponent($json.extracted_email) }}&select=*",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJidXZ5aHljeWF1ZnRja21zeGd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwOTk2ODYsImV4cCI6MjA5NDY3NTY4Nn0.EuoAHw7q4awrZaPZnU2Kb8vEoM8Fo4wQMCv3xjaIjRU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJidXZ5aHljeWF1ZnRja21zeGd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwOTk2ODYsImV4cCI6MjA5NDY3NTY4Nn0.EuoAHw7q4awrZaPZnU2Kb8vEoM8Fo4wQMCv3xjaIjRU"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "3698fd9a-291d-4b06-b6f6-cb237c589e13",
+      "name": "Supabase Lookup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        0,
+        208
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// DB RESULT PROCESSOR\n// ============================================================\n\nconst items = $input.all();\nconst item = items[0];\nconst data = item.json;\n\nconst intent = $('Parse GPT JSON').first().json.intent ?? 'unknown';\nconst extracted_email = $('Parse GPT JSON').first().json.extracted_email ?? '';\nconst original_query = $('Parse GPT JSON').first().json.original_query ?? '';\nconst confidence = $('Parse GPT JSON').first().json.confidence ?? 0.9;\n\nlet final_response = '';\nlet route = 'db_success';\n\n// ------------------------------------------------------------\n// ERROR CHECK\n// ------------------------------------------------------------\n\nif (!data || data.error) {\n  final_response =\n    'We are having trouble reaching our systems right now. Please raise a support ticket and our team will respond within 24 hours:\\n\\nhttps://bookleafpublishing.freshdesk.com/support/tickets/new';\n\n  route = 'db_down';\n\n  return [\n    {\n      json: {\n        final_response,\n        route,\n        intent,\n        extracted_email,\n        confidence,\n        original_query,\n      },\n    },\n  ];\n}\n\n// ------------------------------------------------------------\n// AUTHOR DATA\n// ------------------------------------------------------------\n\nconst author = data;\n\nconst bookTitle = author.book_title ?? 'your book';\nconst bookLiveDate = author.book_live_date ?? null;\nconst royaltyStatus = author.royalty_status ?? 'Pending';\nconst submissionDate = author.final_submission_date ?? null;\nconst isbn = author.isbn ?? null;\nconst addOns = Array.isArray(author.add_on_services)\n  ? author.add_on_services.join(', ')\n  : 'None';\n\nconst name = author.name\n  ? `Hi ${author.name.split(' ')[0]}, `\n  : '';\n\n// ------------------------------------------------------------\n// INTENT HANDLING\n// ------------------------------------------------------------\n\nif (intent === 'book_live_status') {\n\n  if (bookLiveDate) {\n\n    final_response =\n      `${name}Your book **\"${bookTitle}\"** went live on **${bookLiveDate}**.` +\n      `${isbn ? ` Your ISBN is \\`${isbn}\\`.` : ''} ` +\n      `You can find it on the BookLeaf bookstore right now.`;\n\n  } else {\n\n    final_response =\n      `${name}Your book **\"${bookTitle}\"** is currently being processed and is not live yet.` +\n      `${submissionDate ? ` We received your submission on ${submissionDate}.` : ''} ` +\n      `Publishing typically takes 30 to 45 business days. We will email you as soon as it goes live.`;\n  }\n\n} else if (intent === 'royalty_status') {\n\n  const royaltyMap = {\n    Pending:\n      'not yet generated. It will be available once your book has active sales.',\n\n    Processing:\n      'currently being processed by our finance team.',\n\n    Paid:\n      'already paid out. Check your registered bank details or email for the transfer.',\n  };\n\n  const royaltyNote =\n    royaltyMap[royaltyStatus] ?? royaltyStatus;\n\n  final_response =\n    `${name}Your royalty status for **\"${bookTitle}\"** is: **${royaltyStatus}**. ` +\n    `This means it is ${royaltyNote}\\n\\n` +\n    `Reminder: BookLeaf pays 80% royalty on profits. ` +\n    `For a detailed breakdown, raise a ticket:\\n` +\n    `https://bookleafpublishing.freshdesk.com/support/tickets/new`;\n\n} else if (intent === 'author_copy') {\n\n  if (bookLiveDate) {\n\n    final_response =\n      `${name}Your free author copy coupon for **\"${bookTitle}\"** should have been sent ` +\n      `to your registered email after publication on **${bookLiveDate}**. ` +\n      `Please check your inbox and spam folder.\\n\\n` +\n      `If you still cannot find it, raise a ticket:\\n` +\n      `https://bookleafpublishing.freshdesk.com/support/tickets/new`;\n\n  } else {\n\n    final_response =\n      `${name}Your author copy coupon will be sent once **\"${bookTitle}\"** is published. ` +\n      `The book is still being processed. We will notify you by email once it is ready.`;\n  }\n\n} else if (intent === 'add_on_status') {\n\n  final_response =\n    `${name}Here are the add-on services on your account for **\"${bookTitle}\"**:\\n\\n` +\n    `${addOns}\\n\\n` +\n    `If anything looks incorrect or you would like to add a service, raise a ticket:\\n` +\n    `https://bookleafpublishing.freshdesk.com/support/tickets/new`;\n\n} else {\n\n  final_response =\n    `${name}Here is a summary of your account:\\n\\n` +\n    `Book: **\"${bookTitle}\"**\\n` +\n    `Submitted: ${submissionDate ?? 'N/A'}\\n` +\n    `Live date: ${bookLiveDate ?? 'Pending'}\\n` +\n    `Royalty status: ${royaltyStatus}\\n` +\n    `Add-ons: ${addOns}\\n\\n` +\n    `Please let me know if you need anything else.`;\n}\n\n// ------------------------------------------------------------\n// SUCCESS\n// ------------------------------------------------------------\n\nroute = 'db_success';\n\nreturn [\n  {\n    json: {\n      final_response,\n      route,\n      intent,\n      extracted_email,\n      confidence,\n      original_query,\n    },\n  },\n];"
+      },
+      "id": "8f0e2e04-a691-4344-8ff2-8c95d1653323",
+      "name": "DB Result Processor",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ask-email-resp",
+              "name": "final_response",
+              "value": "={{ $json.gpt_response }}",
+              "type": "string"
+            },
+            {
+              "id": "ask-email-route",
+              "name": "route",
+              "value": "ask_email",
+              "type": "string"
+            },
+            {
+              "id": "ask-email-intent",
+              "name": "intent",
+              "value": "={{ $json.intent }}",
+              "type": "string"
+            },
+            {
+              "id": "ask-email-email",
+              "name": "extracted_email",
+              "value": "={{ $json.extracted_email }}",
+              "type": "string"
+            },
+            {
+              "id": "ask-email-conf",
+              "name": "confidence",
+              "value": "={{ $json.confidence }}",
+              "type": "number"
+            },
+            {
+              "id": "ask-email-query",
+              "name": "original_query",
+              "value": "={{ $json.original_query }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e6e03576-a4d5-419a-a3a4-55873522999d",
+      "name": "Ask Email Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "kb-resp",
+              "name": "final_response",
+              "value": "={{ $json.gpt_response }}",
+              "type": "string"
+            },
+            {
+              "id": "kb-route",
+              "name": "route",
+              "value": "kb_or_greeting",
+              "type": "string"
+            },
+            {
+              "id": "kb-intent",
+              "name": "intent",
+              "value": "={{ $json.intent }}",
+              "type": "string"
+            },
+            {
+              "id": "kb-email",
+              "name": "extracted_email",
+              "value": "={{ $json.extracted_email }}",
+              "type": "string"
+            },
+            {
+              "id": "kb-conf",
+              "name": "confidence",
+              "value": "={{ $json.confidence }}",
+              "type": "number"
+            },
+            {
+              "id": "kb-query",
+              "name": "original_query",
+              "value": "={{ $json.original_query }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "592157cf-c6cb-4b51-b51b-983be9973c91",
+      "name": "KB or Greeting Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://rbuvyhycyauftckmsxgu.supabase.co/rest/v1/query_logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJidXZ5aHljeWF1ZnRja21zeGd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwOTk2ODYsImV4cCI6MjA5NDY3NTY4Nn0.EuoAHw7q4awrZaPZnU2Kb8vEoM8Fo4wQMCv3xjaIjRU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJidXZ5aHljeWF1ZnRja21zeGd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwOTk2ODYsImV4cCI6MjA5NDY3NTY4Nn0.EuoAHw7q4awrZaPZnU2Kb8vEoM8Fo4wQMCv3xjaIjRU"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": {
+          "query": "={{ $json.original_query ?? '' }}",
+          "email_used": "={{ $json.extracted_email ?? '' }}",
+          "intent": "={{ $json.intent ?? 'unknown' }}",
+          "confidence": "={{ $json.confidence ?? 0 }}",
+          "route": "={{ $json.route ?? 'unknown' }}",
+          "escalated": "={{ ($json.confidence ?? 1) < 0.8 || $json.route === 'escalated' }}",
+          "response_sent": "={{ $json.final_response ?? '' }}"
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "8a618664-dbed-454b-9f0f-968cfcdc57a8",
+      "name": "Log - Escalate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        288,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://rbuvyhycyauftckmsxgu.supabase.co/rest/v1/query_logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJidXZ5aHljeWF1ZnRja21zeGd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwOTk2ODYsImV4cCI6MjA5NDY3NTY4Nn0.EuoAHw7q4awrZaPZnU2Kb8vEoM8Fo4wQMCv3xjaIjRU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJidXZ5aHljeWF1ZnRja21zeGd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwOTk2ODYsImV4cCI6MjA5NDY3NTY4Nn0.EuoAHw7q4awrZaPZnU2Kb8vEoM8Fo4wQMCv3xjaIjRU"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": {
+          "query": "={{ $json.original_query ?? '' }}",
+          "email_used": "={{ $json.extracted_email ?? '' }}",
+          "intent": "={{ $json.intent ?? 'unknown' }}",
+          "confidence": "={{ $json.confidence ?? 0 }}",
+          "route": "={{ $json.route ?? 'unknown' }}",
+          "escalated": false,
+          "response_sent": "={{ $json.final_response ?? '' }}"
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "1b901b69-42ca-4369-8239-d43753577e64",
+      "name": "Log - Ask Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        288,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://rbuvyhycyauftckmsxgu.supabase.co/rest/v1/query_logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJidXZ5aHljeWF1ZnRja21zeGd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwOTk2ODYsImV4cCI6MjA5NDY3NTY4Nn0.EuoAHw7q4awrZaPZnU2Kb8vEoM8Fo4wQMCv3xjaIjRU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJidXZ5aHljeWF1ZnRja21zeGd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwOTk2ODYsImV4cCI6MjA5NDY3NTY4Nn0.EuoAHw7q4awrZaPZnU2Kb8vEoM8Fo4wQMCv3xjaIjRU"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": {
+          "query": "={{ $json.original_query ?? '' }}",
+          "email_used": "={{ $json.extracted_email ?? '' }}",
+          "intent": "={{ $json.intent ?? 'unknown' }}",
+          "confidence": "={{ $json.confidence ?? 0 }}",
+          "route": "={{ $json.route ?? 'unknown' }}",
+          "escalated": false,
+          "response_sent": "={{ $json.final_response ?? '' }}"
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "8a392843-b469-4746-b43d-26d01bd54b28",
+      "name": "Log - KB Greeting",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        288,
+        560
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://rbuvyhycyauftckmsxgu.supabase.co/rest/v1/query_logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJidXZ5aHljeWF1ZnRja21zeGd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwOTk2ODYsImV4cCI6MjA5NDY3NTY4Nn0.EuoAHw7q4awrZaPZnU2Kb8vEoM8Fo4wQMCv3xjaIjRU"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJidXZ5aHljeWF1ZnRja21zeGd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwOTk2ODYsImV4cCI6MjA5NDY3NTY4Nn0.EuoAHw7q4awrZaPZnU2Kb8vEoM8Fo4wQMCv3xjaIjRU"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": {
+          "query": "={{ $json.original_query ?? '' }}",
+          "email_used": "={{ $json.extracted_email ?? '' }}",
+          "intent": "={{ $json.intent ?? 'unknown' }}",
+          "confidence": "={{ $json.confidence ?? 0 }}",
+          "route": "={{ $json.route ?? 'unknown' }}",
+          "escalated": false,
+          "response_sent": "={{ $json.final_response ?? '' }}"
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "a30e00ae-a989-46dc-850a-0eb6b0806bc8",
+      "name": "Log - DB Result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        560,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "send-output",
+              "name": "output",
+              "value": "={{ $('Escalation Response').first().json.final_response || 'Something went wrong. Please contact support at https://bookleafpublishing.freshdesk.com/support/tickets/new' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d23e3b07-e24e-4cdd-bfcb-a53c0f9202f0",
+      "name": "Send - Escalate",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        560,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "send-output-ask",
+              "name": "output",
+              "value": "={{ $('Ask Email Response').first().json.final_response || 'Could you please share your registered email address?' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9b7b7bb1-ba06-4603-baae-f5c481b45ff7",
+      "name": "Send - Ask Email",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        560,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "send-output-kb",
+              "name": "output",
+              "value": "={{ $('KB or Greeting Response').first().json.final_response || 'I had trouble processing that. Please try again.' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ee95f75e-8357-4b53-8784-08a44b3c5299",
+      "name": "Send - KB Greeting",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        576,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "send-output-db",
+              "name": "output",
+              "value": "={{ $('DB Result Processor').first().json.final_response }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "cca637ed-f92f-4607-8c14-b292625e27ad",
+      "name": "Send - DB Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        848,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "send-output-ai-err",
+              "name": "output",
+              "value": "={{ $json.gpt_response ?? 'Our AI assistant is temporarily unavailable. Please contact support at https://bookleafpublishing.freshdesk.com/support/tickets/new' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c5c501b5-33b0-41f7-afcc-5a8104234020",
+      "name": "Send - AI Error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -288,
+        560
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Chat Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Prompt": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Parse GPT JSON",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse GPT JSON": {
+      "main": [
+        [
+          {
+            "node": "Smart Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Error Handler": {
+      "main": [
+        [
+          {
+            "node": "Send - AI Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Smart Router": {
+      "main": [
+        [
+          {
+            "node": "Escalation Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supabase Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ask Email Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "KB or Greeting Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escalation Response": {
+      "main": [
+        [
+          {
+            "node": "Log - Escalate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log - Escalate": {
+      "main": [
+        [
+          {
+            "node": "Send - Escalate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Lookup": {
+      "main": [
+        [
+          {
+            "node": "DB Result Processor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB Result Processor": {
+      "main": [
+        [
+          {
+            "node": "Log - DB Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log - DB Result": {
+      "main": [
+        [
+          {
+            "node": "Send - DB Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask Email Response": {
+      "main": [
+        [
+          {
+            "node": "Log - Ask Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log - Ask Email": {
+      "main": [
+        [
+          {
+            "node": "Send - Ask Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KB or Greeting Response": {
+      "main": [
+        [
+          {
+            "node": "Log - KB Greeting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log - KB Greeting": {
+      "main": [
+        [
+          {
+            "node": "Send - KB Greeting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "fb425871-252b-4c7e-9342-de599fb9c7a1",
+  "meta": {
+    "instanceId": "d854e7f9fa38158734ba9a5ff96e3d4673634cce7c17990e0a8e3b54987e9cba"
+  },
+  "id": "5gXrxbFUZnTmG31k",
+  "tags": []
+}
